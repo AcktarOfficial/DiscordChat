@@ -34,6 +34,20 @@ discordCommand: true
 discordCommandOutput: "Join our Discord server at §e<put your invite here>§f!"
 
 
+# enable /linkdiscord command in game | allows players to link there discord account for a discord role
+linkCommand: true
+# whether to add a role on discord after linked!
+addRoleOnDiscord: true
+# the role ID if addRoleOnDiscord is true
+discordRoleID: "1324119853866553449"
+# whether to add a role on minecraft after linked (usually a Discord rank)
+addRoleOnMinecraft: true
+# Role in Multipass
+minecraftRole: "discord"
+# whether to change users discord username to the actual in game name!
+changeUsername: false
+
+
 # enable join messages to Discord
 joinMessages: true
 # enable quit messages to Discord
