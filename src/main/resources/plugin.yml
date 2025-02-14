@@ -2,6 +2,7 @@ name: DiscordChat
 main: me.petterim1.discordchat.Loader
 version: "${pom.version}"
 api: ["1.0.0"]
+softdepend: [LuckPerms]
 author: PetteriM1
 description: Sync Discord chat with your Nukkit server
 website: https://cloudburstmc.org/resources/discordchat.137/
