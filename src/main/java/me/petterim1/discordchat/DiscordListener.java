@@ -7,6 +7,11 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.group.Group;
+import net.luckperms.api.node.Node;
+import net.luckperms.api.model.user.User;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
@@ -26,6 +31,22 @@ public class DiscordListener extends ListenerAdapter {
         if (e.getMember() == null || Loader.jda == null || e.getAuthor().equals(Loader.jda.getSelfUser())) {
             return;
         }
+
+        // hacky way for the command cuz your discord command handler is too good for me xD
+        
+        String messagde = e.getMessage().getContentRaw().trim();
+        if (messagde.startsWith("!verify ")) {
+            String[] parts = messagde.split(" ", 2);
+            if (parts.length < 2) {
+                e.getChannel().sendMessage("❌ Usage: `!verify <code>`").queue();
+                return;
+            }
+
+            String code = parts[1].trim();
+            processVerification(e, code);
+            return;
+        }
+        
         for (DiscordChatReceiver receiver : receivers) {
             receiver.receive(e);
         }
@@ -100,6 +121,110 @@ public class DiscordListener extends ListenerAdapter {
             return true;
         }
         return false;
+    }
+
+    private void processVerification(GuildMessageReceivedEvent event, String code) {
+        Player matchedPlayer = null;
+        UUID uuid = null;
+        String playerName = "Unknown";
+
+        for (Player player : Server.getInstance().getOnlinePlayers().values()) {
+            if (LinkCommand.verifyCode(player.getUniqueId(), code)) {
+                uuid = player.getUniqueId();
+                matchedPlayer = player;
+                break;
+            }
+        }
+
+        if (uuid == null) {
+            uuid = LinkCommand.getUUIDByCode(code);
+        }
+
+        if (uuid != null) {
+            playerName = matchedPlayer != null ? matchedPlayer.getName() : "Offline Player";
+
+            if (LinkCommand.isAlreadyLinked(uuid)) {
+                event.getChannel().sendMessage("❌ This Minecraft account is already linked to another Discord account!").queue();
+                return;
+            }
+
+            if (Loader.config.getBoolean("addRoleOnDiscord")) {
+                Role verifiedRole = event.getGuild().getRoleById(Loader.config.getString("discordRoleID"));
+                if (verifiedRole != null) {
+                    event.getGuild().addRoleToMember(event.getMember(), verifiedRole).queue();
+                }
+            }
+
+            if (Loader.config.getBoolean("changeUsername")) {
+                event.getGuild().modifyNickname(event.getMember(), playerName).queue(
+                        success -> event.getChannel().sendMessage("✅ Your Discord nickname has been updated!").queue(),
+                        throwable -> event.getChannel().sendMessage("⚠️ Failed to update your Discord nickname.").queue()
+                );
+            }
+
+            if (Loader.config.getBoolean("addRoleOnMinecraft")) {
+                addPlayerToGroup(uuid, playerName);
+            }
+            
+            LinkCommand.removeCode(uuid);
+            LinkCommand.addVerifiedAccount(uuid, event.getAuthor().getId());
+        
+        event.getChannel().sendMessage("✅ Your Minecraft account has been linked successfully!").queue();
+        
+        } else {
+            event.getChannel().sendMessage("❌ Invalid verification code!").queue();
+        }
+    }
+
+    private void addPlayerToGroup(UUID uuid, String playerName) {
+    LuckPerms luckPerms = LuckPermsProvider.get();
+    User user = luckPerms.getUserManager().getUser(uuid);
+    
+    if (user == null) {
+        user = luckPerms.getUserManager().loadUser(uuid).join();
+        if (user == null) {
+            Loader.getInstance().getLogger().info("Failed to load user data for " + playerName);
+            API.sendMessage("Failed to load user data for " + playerName + "! Please contact an administrator regarding this issue.");
+            return;
+        }
+    }
+
+    String groupName = Loader.config.getString("minecraftRole");
+    if (groupName == null || groupName.isEmpty()) {
+        Loader.getInstance().getLogger().info("Config value 'minecraftRole' is missing or empty.");
+        API.sendMessage("Config value 'minecraftRole' is missing or empty! Please contact an administrator regarding this issue.");
+        return;
+    }
+    
+    Group group = luckPerms.getGroupManager().getGroup(groupName);
+    if (group == null) {
+        Loader.getInstance().getLogger().info("Group '" + groupName + "' does not exist!");
+        API.sendMessage("Group '" + groupName + "' does not exist! Please contact an administrator regarding this issue.");
+        return;
+    }
+    
+  // Check if the user already has the group
+    if (user.getNodes().stream().anyMatch(node -> node.getKey().equals("group." + groupName))) {
+        Loader.getInstance().getLogger().info(playerName + " is already in the group: " + groupName);
+        API.sendMessage(playerName + " is already in the group: " + groupName);
+        return;
+    }
+    
+    try {
+        user.setPrimaryGroup(groupName);
+        luckPerms.getUserManager().saveUser(user);
+        Loader.getInstance().getLogger().info(playerName + " has been promoted to the " + groupName + " rank!");
+        API.sendMessage(playerName + " has been promoted to the " + groupName + " rank!");
+
+        // Notify the player if they are online
+        Player onlinePlayer = Server.getInstance().getPlayerExact(playerName);
+        if (onlinePlayer != null) {
+            onlinePlayer.sendMessage("You have been rewarded with the: " + groupName + " rank! Thanks for linking your Discord Account!");
+        }
+    } catch (Exception ex) {
+        Loader.getInstance().getLogger().warning("Failed to set primary group for " + playerName + ": " + ex.getMessage());
+        API.sendMessage("A critical error occured while setting your new rank! Please contact an administrator regarding this issue.");
+    }
     }
 
     private static Role getRole(Member m) {
