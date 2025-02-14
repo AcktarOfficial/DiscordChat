@@ -10,6 +10,16 @@ commands:
     description: "Discord"
     usage: "/discord [mute|unmute|reload]"
     permission: discordchat.command
+  linkdiscord:
+    description: "Get a verification code to link your Discord Account!"
+    usage: "/linkdiscord"
+    permission: discordchat.command
+  unlinkdiscord:
+    description: "Admin| Unlink a players discord ID from his account!"
+    usage: "/unlinkdiscord <playername>"
+    permission: discordchat.admin
 permissions:
   discordchat.command:
     default: true
+  discordchat.admin:
+    default: op
