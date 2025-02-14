@@ -3,10 +3,15 @@ package me.petterim1.discordchat;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.plugin.Plugin;
+import cn.nukkit.plugin.PluginManager;
+import cn.nukkit.Server;
 import cn.nukkit.utils.Config;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
 
 import java.util.regex.Pattern;
 
@@ -20,6 +25,7 @@ public class Loader extends PluginBase {
     static boolean debug;
     static boolean queueMessages;
     static MessageQueue messageQueue;
+    private LuckPerms luckPerms;
     static final DiscordCommandSender discordCommandSender = new DiscordCommandSender();
     private static final PlayerListener playerListener = new PlayerListener();
     private static final DiscordListener discordListener = new DiscordListener();
@@ -37,6 +43,26 @@ public class Loader extends PluginBase {
             if (debug) {
                 getLogger().notice("Running DiscordChat in debug mode");
             }
+
+            if (isLuckPermsEnabled()) {
+            try {
+                luckPerms = LuckPermsProvider.get();
+                getLogger().info("LuckPerms detected and API is available!");
+            } catch (Exception e) {
+                if (config.getBoolean("addRoleOnMinecraft") == true) {
+                getLogger().warning("LuckPerms plugin is enabled, but API is not accessible.");
+                this.getPluginLoader().disablePlugin(this);
+                return;
+                   }
+               }
+            } else {
+            if (config.getBoolean("addRoleOnMinecraft") == true) {
+                getLogger().warning("LuckPerms is not installed or disabled!");
+                this.getPluginLoader().disablePlugin(this);
+                return;
+               }
+            }
+            
             String pattern = config.getString("messageFilterRegex");
             if (!pattern.isEmpty()) {
                 getLogger().info("DEBUG: Setting message filter to " + pattern);
@@ -133,6 +159,12 @@ public class Loader extends PluginBase {
         }
     }
 
+    private boolean isLuckPermsEnabled() {
+        PluginManager pluginManager = Server.getInstance().getPluginManager();
+        Plugin luckPermsPlugin = pluginManager.getPlugin("LuckPerms");
+        return luckPermsPlugin != null && luckPermsPlugin.isEnabled();
+    }
+
     private void checkAndUpdateConfig() {
         int current = 11;
         int ver = config.getInt("configVersion");
@@ -207,8 +239,27 @@ public class Loader extends PluginBase {
         }
     }
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+public static Loader getInstance() {
+    return instance;
+}
+
+     @Override
+public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    // Handle /discord command
+    if (command.getName().equalsIgnoreCase("discord")) {
         return DiscordCommand.handleCommand(sender, command, label, args);
     }
+    
+    // Handle /linkdiscord command
+    if (command.getName().equalsIgnoreCase("linkdiscord")) {
+        return LinkCommand.handleCommand(sender, command, label, args);
+    }
+    
+     // Handle /unlinkdiscord command
+    if (command.getName().equalsIgnoreCase("unlinkdiscord")) {
+        return UnlinkCommand.handleCommand(sender, command, label, args);
+    }
+
+    return false; // Unknown command
+  }
 }
