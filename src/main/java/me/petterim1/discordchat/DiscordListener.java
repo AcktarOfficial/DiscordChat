@@ -211,7 +211,7 @@ public class DiscordListener extends ListenerAdapter {
     if (user.getNodes().stream().anyMatch(node -> node.getKey().equals("group." + groupName))) {
         Loader.getInstance().getLogger().info(playerName + " is already in the group: " + groupName);
         API.sendMessage(playerName + " is already in the group: " + groupName);
-        return;
+        return true;
     }
     
     try {
