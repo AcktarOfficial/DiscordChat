@@ -148,10 +148,21 @@ public class DiscordListener extends ListenerAdapter {
                 return;
             }
 
+            if (Loader.config.getBoolean("addRoleOnMinecraft")) {
+                boolean success = addPlayerToGroup(uuid, playerName);
+            if (!success) {
+                event.getChannel().sendMessage("An internal error occured! See below for more information. Please contact an administrator.").queue();
+                return;
+               }
+            }
+
             if (Loader.config.getBoolean("addRoleOnDiscord")) {
                 Role verifiedRole = event.getGuild().getRoleById(Loader.config.getString("discordRoleID"));
                 if (verifiedRole != null) {
                     event.getGuild().addRoleToMember(event.getMember(), verifiedRole).queue();
+                } else {
+                    event.getChannel().sendMessage("Due to a Configuration issue, we were unable to complete your verification! Please contact an administrator");
+                    return;
                 }
             }
 
@@ -161,14 +172,6 @@ public class DiscordListener extends ListenerAdapter {
                         throwable -> event.getChannel().sendMessage("⚠️ Failed to update your Discord nickname.").queue()
                 );
             }
-
-        if (Loader.config.getBoolean("addRoleOnMinecraft")) {
-           boolean success = addPlayerToGroup(uuid, playerName);
-        if (!success) {
-           event.getChannel().sendMessage("⚠️ Your account was linked, but there was an issue assigning your rank. Please contact an administrator.").queue();
-        return;
-            }
-        }
             
             LinkCommand.removeCode(uuid);
             LinkCommand.addVerifiedAccount(uuid, event.getAuthor().getId());
@@ -188,7 +191,7 @@ public class DiscordListener extends ListenerAdapter {
         user = luckPerms.getUserManager().loadUser(uuid).join();
         if (user == null) {
             Loader.getInstance().getLogger().info("Failed to load user data for " + playerName);
-            API.sendMessage("Failed to load user data for " + playerName + "! Please contact an administrator regarding this issue.");
+            API.sendMessage("```Failed to load user data for " + playerName + "! Please contact an administrator regarding this issue.```");
             return false;
         }
     }
@@ -196,21 +199,21 @@ public class DiscordListener extends ListenerAdapter {
     String groupName = Loader.config.getString("minecraftRole");
     if (groupName == null || groupName.isEmpty()) {
         Loader.getInstance().getLogger().info("Config value 'minecraftRole' is missing or empty.");
-        API.sendMessage("Config value 'minecraftRole' is missing or empty! Please contact an administrator regarding this issue.");
+        API.sendMessage("```Config value 'minecraftRole' is missing or empty! Please contact an administrator regarding this issue.```");
         return false;
     }
     
     Group group = luckPerms.getGroupManager().getGroup(groupName);
     if (group == null) {
         Loader.getInstance().getLogger().info("Group '" + groupName + "' does not exist!");
-        API.sendMessage("Group '" + groupName + "' does not exist! Please contact an administrator regarding this issue.");
+        API.sendMessage("```Group '" + groupName + "' does not exist! Please contact an administrator regarding this issue.```");
         return false;
     }
     
   // Check if the user already has the group
     if (user.getNodes().stream().anyMatch(node -> node.getKey().equals("group." + groupName))) {
         Loader.getInstance().getLogger().info(playerName + " is already in the group: " + groupName);
-        API.sendMessage(playerName + " is already in the group: " + groupName);
+        API.sendMessage("```" + playerName + " is already in the group: " + groupName + "```");
         return true;
     }
     
@@ -218,7 +221,7 @@ public class DiscordListener extends ListenerAdapter {
         user.setPrimaryGroup(groupName);
         luckPerms.getUserManager().saveUser(user);
         Loader.getInstance().getLogger().info(playerName + " has been promoted to the " + groupName + " rank!");
-        API.sendMessage(playerName + " has been promoted to the " + groupName + " rank!");
+        API.sendMessage(playerName + " has been promoted to the " + groupName + " rank! 🎁🥳🎉");
 
         // Notify the player if they are online
         Player onlinePlayer = Server.getInstance().getPlayerExact(playerName);
@@ -228,7 +231,7 @@ public class DiscordListener extends ListenerAdapter {
         return true;
     } catch (Exception ex) {
         Loader.getInstance().getLogger().warning("Failed to set primary group for " + playerName + ": " + ex.getMessage());
-        API.sendMessage("A critical error occured while setting your new rank! Please contact an administrator regarding this issue.");
+        API.sendMessage("```A critical error occured while setting your new rank! Please contact an administrator regarding this issue.```");
         return false;
     }
     }
