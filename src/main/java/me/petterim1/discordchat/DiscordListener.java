@@ -162,9 +162,13 @@ public class DiscordListener extends ListenerAdapter {
                 );
             }
 
-            if (Loader.config.getBoolean("addRoleOnMinecraft")) {
-                addPlayerToGroup(uuid, playerName);
+        if (Loader.config.getBoolean("addRoleOnMinecraft")) {
+           boolean success = addPlayerToGroup(uuid, playerName);
+        if (!success) {
+           event.getChannel().sendMessage("⚠️ Your account was linked, but there was an issue assigning your rank. Please contact an administrator.").queue();
+        return;
             }
+        }
             
             LinkCommand.removeCode(uuid);
             LinkCommand.addVerifiedAccount(uuid, event.getAuthor().getId());
@@ -176,7 +180,7 @@ public class DiscordListener extends ListenerAdapter {
         }
     }
 
-    private void addPlayerToGroup(UUID uuid, String playerName) {
+    private boolean addPlayerToGroup(UUID uuid, String playerName) {
     LuckPerms luckPerms = LuckPermsProvider.get();
     User user = luckPerms.getUserManager().getUser(uuid);
     
@@ -185,7 +189,7 @@ public class DiscordListener extends ListenerAdapter {
         if (user == null) {
             Loader.getInstance().getLogger().info("Failed to load user data for " + playerName);
             API.sendMessage("Failed to load user data for " + playerName + "! Please contact an administrator regarding this issue.");
-            return;
+            return false;
         }
     }
 
@@ -193,14 +197,14 @@ public class DiscordListener extends ListenerAdapter {
     if (groupName == null || groupName.isEmpty()) {
         Loader.getInstance().getLogger().info("Config value 'minecraftRole' is missing or empty.");
         API.sendMessage("Config value 'minecraftRole' is missing or empty! Please contact an administrator regarding this issue.");
-        return;
+        return false;
     }
     
     Group group = luckPerms.getGroupManager().getGroup(groupName);
     if (group == null) {
         Loader.getInstance().getLogger().info("Group '" + groupName + "' does not exist!");
         API.sendMessage("Group '" + groupName + "' does not exist! Please contact an administrator regarding this issue.");
-        return;
+        return false;
     }
     
   // Check if the user already has the group
@@ -221,9 +225,11 @@ public class DiscordListener extends ListenerAdapter {
         if (onlinePlayer != null) {
             onlinePlayer.sendMessage("You have been rewarded with the: " + groupName + " rank! Thanks for linking your Discord Account!");
         }
+        return true;
     } catch (Exception ex) {
         Loader.getInstance().getLogger().warning("Failed to set primary group for " + playerName + ": " + ex.getMessage());
         API.sendMessage("A critical error occured while setting your new rank! Please contact an administrator regarding this issue.");
+        return false;
     }
     }
 
