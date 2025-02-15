@@ -36,6 +36,7 @@ public class Loader extends PluginBase {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        LinkCommand.init();
         config = getConfig();
         checkAndUpdateConfig();
         try {
