@@ -1,21 +1,19 @@
 package me.petterim1.discordchat;
 
-import cn.nukkit.command.Command;
-import cn.nukkit.command.CommandSender;
-import cn.nukkit.plugin.PluginBase;
-import cn.nukkit.plugin.Plugin;
-import cn.nukkit.plugin.PluginManager;
-import cn.nukkit.Server;
-import cn.nukkit.utils.Config;
+import org.allaymc.api.command.Command;
+import org.allaymc.api.command.CommandSender;
+import org.allaymc.api.plugin.Plugin;
+import org.allaymc.api.Server;
+import org.allaymc.api.utils.config.Config;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
-import net.luckperms.api.LuckPerms;
-import net.luckperms.api.LuckPermsProvider;
+// import net.luckperms.api.LuckPerms;
+// import net.luckperms.api.LuckPermsProvider;
 
 import java.util.regex.Pattern;
 
-public class Loader extends PluginBase {
+public class Loader extends Plugin {
 
     static Loader instance;
     static Config config;
@@ -25,7 +23,7 @@ public class Loader extends PluginBase {
     static boolean debug;
     static boolean queueMessages;
     static MessageQueue messageQueue;
-    private LuckPerms luckPerms;
+    // private LuckPerms luckPerms;
     static final DiscordCommandSender discordCommandSender = new DiscordCommandSender();
     private static final PlayerListener playerListener = new PlayerListener();
     private static final DiscordListener discordListener = new DiscordListener();
@@ -35,103 +33,66 @@ public class Loader extends PluginBase {
     @Override
     public void onEnable() {
         instance = this;
-        saveDefaultConfig();
+        loadConfig();
         LinkCommand.init();
-        config = getConfig();
-        checkAndUpdateConfig();
+
         try {
             debug = config.getBoolean("debug");
             if (debug) {
-                getLogger().notice("Running DiscordChat in debug mode");
+                getLogger().info("Running DiscordChat in debug mode");
             }
 
-            if (isLuckPermsEnabled()) {
-            try {
-                luckPerms = LuckPermsProvider.get();
-                getLogger().info("LuckPerms detected and API is available!");
-            } catch (Exception e) {
-                if (config.getBoolean("addRoleOnMinecraft") == true) {
-                getLogger().warning("LuckPerms plugin is enabled, but API is not accessible.");
-                this.getPluginLoader().disablePlugin(this);
-                return;
-                   }
-               }
+            /** if (isLuckPermsEnabled()) {
+                try {
+                    luckPerms = LuckPermsProvider.get();
+                    getLogger().info("LuckPerms detected and API is available!");
+                } catch (Exception e) {
+                    if (config.getBoolean("addRoleOnMinecraft")) {
+                        getLogger().warning("LuckPerms is enabled, but API is not accessible.");
+                        this.disable();
+                        return;
+                    }
+                }
             } else {
-            if (config.getBoolean("addRoleOnMinecraft") == true) {
-                getLogger().warning("LuckPerms is not installed or disabled!");
-                this.getPluginLoader().disablePlugin(this);
-                return;
-               }
-            }
-            
-            String pattern = config.getString("messageFilterRegex");
+                if (config.getBoolean("addRoleOnMinecraft")) {
+                    getLogger().warning("LuckPerms is not installed or disabled!");
+                    this.disable();
+                    return;
+                }
+            } */
+
+            String pattern = config.getString("messageFilterRegex", "");
             if (!pattern.isEmpty()) {
-                getLogger().info("DEBUG: Setting message filter to " + pattern);
                 messageFilterRegex = Pattern.compile(pattern);
             }
-            if (debug) {
-                getLogger().info("DEBUG: Logging in to Discord");
-            }
+
             jda = JDABuilder.createDefault(config.getString("botToken")).build();
-            if (debug) {
-                getLogger().info("DEBUG: Waiting JDA");
-            }
             jda.awaitReady();
-            if (debug) {
-                getLogger().info("DEBUG: Registering events for PlayerListener");
-            }
-            getServer().getPluginManager().registerEvents(playerListener, this);
-            channelId = config.getString("channelId", "null");
-            if (debug) {
-                getLogger().info("DEBUG: Setting server channel id to " + channelId);
-            }
-            if (debug) {
-                getLogger().info("DEBUG: Registering events for DiscordListener");
-            }
+
+            Server.getInstance().getEventManager().registerListener(this, playerListener);
             jda.addEventListener(discordListener);
+
+            channelId = config.getString("channelId", "null");
             if (config.getBoolean("discordConsole")) {
                 consoleChannelId = config.getString("consoleChannelId", "null");
-                if (debug) {
-                    getLogger().info("DEBUG: Setting console channel id to " + consoleChannelId);
-                }
-                if (debug) {
-                    getLogger().info("DEBUG: Registering events for DiscordConsoleListener");
-                }
                 jda.addEventListener(discordConsoleListener);
-                if (config.getBoolean("consoleStatusMessages")) {
-                    API.sendToConsole(config.getString("console_status_server_start"));
-                }
             }
+
             if (!config.getString("botStatus").isEmpty()) {
-                if (debug) {
-                    getLogger().info("DEBUG: Setting bot status to " + config.getString("botStatus"));
-                }
                 jda.getPresence().setActivity(Activity.of(Activity.ActivityType.DEFAULT, config.getString("botStatus")));
             }
-            if (!config.getString("channelTopic").isEmpty()) {
-                if (debug) {
-                    getLogger().info("DEBUG: Setting channel topic to " + config.getString("channelTopic"));
-                }
-                API.setTopic(config.getString("channelTopic"));
-            }
-            //noinspection AssignmentUsedAsCondition
+
             if (queueMessages = config.getBoolean("queueMessages")) {
-                if (debug) {
-                    getLogger().info("DEBUG: Starting message queue");
-                }
-                getServer().getScheduler().scheduleDelayedRepeatingTask(this, messageQueue = new MessageQueue(), 20, 20, true);
+                Server.getInstance().getScheduler().scheduleRepeatingTask(this, messageQueue = new MessageQueue(), 20);
             }
+
             if (jda.getGuilds().isEmpty()) {
-                getLogger().notice("Your Discord bot is not on any server. See https://cloudburstmc.org/resources/discordchat.137/ if you need help with the setup.");
+                getLogger().warning("Your Discord bot is not on any server.");
             }
-            if (config.getBoolean("startMessages")) {
-                API.sendMessage(config.getString("status_server_started"));
-            }
-            if (debug) {
-                getLogger().info("DEBUG: Startup done successfully");
-            }
+
+            getLogger().info("DiscordChat enabled successfully.");
         } catch (Exception e) {
-            getLogger().error("There was an error while enabling DiscordChat", e);
+            getLogger().error("Error enabling DiscordChat", e);
         }
     }
 
@@ -140,127 +101,131 @@ public class Loader extends PluginBase {
         if (config.getBoolean("stopMessages")) {
             API.sendMessage(config.getString("status_server_stopped"));
         }
-        if (config.getBoolean("consoleStatusMessages") && config.getBoolean("discordConsole")) {
-            API.sendToConsole(config.getString("console_status_server_stop"));
-        }
-        if (debug) {
-            getLogger().info("DEBUG: Disabling the plugin");
-        }
         if (jda != null) {
             if (messageQueue != null) {
-                if (debug) {
-                    getLogger().info("DEBUG: Sending previously queued messages");
-                }
                 messageQueue.run();
             }
             jda.shutdown();
-            if (debug) {
-                getLogger().info("DEBUG: JDA shutdown called");
-            }
         }
     }
 
-    private boolean isLuckPermsEnabled() {
-        PluginManager pluginManager = Server.getInstance().getPluginManager();
-        Plugin luckPermsPlugin = pluginManager.getPlugin("LuckPerms");
-        return luckPermsPlugin != null && luckPermsPlugin.isEnabled();
+    private void loadConfig() {
+    config = new Config(getDataFolder() + "/config.yml", Config.YAML);
+
+    if (!config.exists("configVersion")) {
+        getLogger().warning("Config not found! Creating default config...");
+
+        // Config version (do not edit)
+        config.set("configVersion", 1);
+
+        // Bot token
+        config.set("botToken", "");
+        // Discord server chat channel ID
+        config.set("channelId", "");
+        
+        // Enable debug messages
+        config.set("debug", false);
+
+        // Bot status (set "Playing ..." status)
+        config.set("botStatus", "Minecraft");
+
+        // Set text channel topic (leave empty to disable)
+        config.set("channelTopic", "Powered by DiscordChat for AllayMC");
+
+        // Discord command settings
+        config.set("playerListCommand", true);
+        config.set("ipCommand", true);
+        config.set("serverIp", "play.example.com");
+        config.set("serverPort", "19132");
+        config.set("discordCommand", true);
+        config.set("discordCommandOutput", "Join our Discord server at §e<put your invite here>§f!");
+
+        // Linking system
+        config.set("linkCommand", true);
+        config.set("addRoleOnDiscord", true);
+        config.set("discordRoleID", "1324119853866553449");
+        config.set("addRoleOnMinecraft", false);
+        config.set("minecraftRole", "discord");
+        config.set("changeUsername", false);
+
+        // Message toggles
+        config.set("joinMessages", true);
+        config.set("quitMessages", true);
+        config.set("deathMessages", true);
+        config.set("startMessages", true);
+        config.set("stopMessages", true);
+
+        // Cross-server chat settings
+        config.set("enableDiscordToMinecraft", true);
+        config.set("enableMinecraftToDiscord", true);
+        config.set("enableMessagesToConsole", false);
+
+        // Command prefix
+        config.set("commandPrefix", "!");
+
+        // Discord console settings
+        config.set("discordConsole", false);
+        config.set("consoleChannelId", "");
+        config.set("consoleRole", "");
+        config.set("consoleStatusMessages", true);
+        config.set("logConsoleCommands", true);
+
+        // Chat formatting
+        config.set("discordToMinecraftChatFormatting", "§f[§bDiscord §f| %role%§f] %discordname% » %message%");
+        config.set("minecraftToDiscordChatFormatting", "%username% » %message%");
+
+        // Message handling
+        config.set("maxMessageLength", 255);
+        config.set("allowBotMessages", false);
+        config.set("queueMessages", true);
+
+        // Anti-spam settings
+        config.set("messageFilterRegex", "(?i)discord.*?\\..*?\\/|http.*?\\:.*?\\/\\/");
+        config.set("messageFilterReplacement", "<link>");
+
+        // Translations
+        config.set("status_server_started", "**:white_check_mark: Server started!**");
+        config.set("status_server_stopped", "**:x: Server stopped!**");
+        config.set("info_player_joined", "**:heavy_plus_sign: %player% joined the server**");
+        config.set("info_player_left", "**:heavy_minus_sign: %player% left the server**");
+        config.set("info_player_death", "**:skull: %death_message%**");
+        config.set("command_playerlist_empty", "**No online players**");
+        config.set("command_playerlist_players", "Online players");
+        config.set("commands_ip_address", "Address:");
+        config.set("commands_ip_port", "Port:");
+        config.set("err_no_perm", "You don't have permission to run console commands");
+        config.set("console_status_server_start", "The server is starting up...");
+        config.set("console_status_server_stop", "The server is shutting down...");
+        config.set("command_mute_success", "§aDiscord chat muted");
+        config.set("command_mute_already_muted", "§cDiscord chat is already muted");
+        config.set("command_unmute_success", "§aDiscord chat is no longer muted");
+        config.set("command_unmute_not_muted", "§cDiscord chat is not muted");
+        config.set("command_generic_no_perm", "§cYou don't have permission to use this command");
+
+        // Save default config
+        config.save();
+    }
+   }
+
+    /** private boolean isLuckPermsEnabled() {
+        return Server.getInstance().getPluginManager().isPluginEnabled("LuckPerms");
+    } */
+
+    public static Loader getInstance() {
+        return instance;
     }
 
-    private void checkAndUpdateConfig() {
-        int current = 11;
-        int ver = config.getInt("configVersion");
-        if (ver != current) {
-            if (debug) {
-                getLogger().info("DEBUG: Attempting to update config version " + ver + " to " + current);
-            }
-
-            if (ver < 2) {
-                saveResource("config.yml", true);
-                config = getConfig();
-                getLogger().warning("Outdated config file replaced. You will need to set your settings again.");
-                return;
-            }
-
-            if (ver < 11) {
-                config.remove("spamFilter");
-                config.set("messageFilterRegex", "(?i)discord.*?\\..*?\\/|http.*?\\:.*?\\/\\/");
-                config.set("messageFilterReplacement", "<link>");
-            }
-
-            if (ver < 10) {
-                config.set("logConsoleCommands", true);
-            }
-
-            if (ver < 9) {
-                config.set("command_generic_no_perm", "§cYou don't have permission to use this command");
-            }
-
-            if (ver < 8) {
-                config.remove("roleColors");
-                config.set("command_mute_success", "§aDiscord chat muted");
-                config.set("command_mute_already_muted", "§cDiscord chat is already muted");
-                config.set("command_unmute_success", "§aDiscord chat is no longer muted");
-                config.set("command_unmute_not_muted", "§cDiscord chat is not muted");
-            }
-
-            if (ver < 7) {
-                config.set("queueMessages", true);
-            }
-
-            if (ver < 6) {
-                config.set("discordCommand", false);
-                config.set("discordCommandOutput", "Join our Discord server at §e<put your invite here>§f!");
-                config.set("discordToMinecraftChatFormatting", "§f[§bDiscord §f| %role%§f] %discordname% » %message%");
-                config.set("minecraftToDiscordChatFormatting", "%username% » %message%");
-            }
-
-            if (ver < 5) {
-                config.set("consoleStatusMessages", true);
-                config.set("console_status_server_start", "The server is starting up...");
-                config.set("console_status_server_stop", "The server is shutting down...");
-            }
-
-            if (ver < 4) {
-                config.set("consoleRole", "");
-                config.set("err_no_perm", "You don't have permission to run console commands");
-            }
-
-            if (ver < 3) {
-                config.set("commandPrefix", "!");
-            }
-
-            config.set("configVersion", current);
-            config.save();
-            config = getConfig();
-            getLogger().warning("Config file updated to version " + current);
-        } else {
-            if (debug) {
-                getLogger().info("DEBUG: Config is up to date");
-            }
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        switch (command.getName().toLowerCase()) {
+            case "discord":
+                return DiscordCommand.handleCommand(sender, command, label, args);
+            case "linkdiscord":
+                return LinkCommand.handleCommand(sender, command, label, args);
+            case "unlinkdiscord":
+                return UnlinkCommand.handleCommand(sender, command, label, args);
+            default:
+                return false;
         }
     }
-
-public static Loader getInstance() {
-    return instance;
-}
-
-     @Override
-public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-    // Handle /discord command
-    if (command.getName().equalsIgnoreCase("discord")) {
-        return DiscordCommand.handleCommand(sender, command, label, args);
-    }
-    
-    // Handle /linkdiscord command
-    if (command.getName().equalsIgnoreCase("linkdiscord")) {
-        return LinkCommand.handleCommand(sender, command, label, args);
-    }
-    
-     // Handle /unlinkdiscord command
-    if (command.getName().equalsIgnoreCase("unlinkdiscord")) {
-        return UnlinkCommand.handleCommand(sender, command, label, args);
-    }
-
-    return false; // Unknown command
-  }
 }
