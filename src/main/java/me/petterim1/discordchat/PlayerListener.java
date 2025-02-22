@@ -1,16 +1,16 @@
 package me.petterim1.discordchat;
 
-import cn.nukkit.Server;
-import cn.nukkit.event.EventHandler;
-import cn.nukkit.event.EventPriority;
-import cn.nukkit.event.Listener;
-import cn.nukkit.event.player.PlayerChatEvent;
-import cn.nukkit.event.player.PlayerDeathEvent;
-import cn.nukkit.event.player.PlayerJoinEvent;
-import cn.nukkit.event.player.PlayerQuitEvent;
-import cn.nukkit.lang.TextContainer;
-import cn.nukkit.lang.TranslationContainer;
-import cn.nukkit.utils.TextFormat;
+import org.allaymc.api.AllayMC;
+import org.allaymc.api.event.EventHandler;
+import org.allaymc.api.event.EventPriority;
+import org.allaymc.api.event.Listener;
+import org.allaymc.api.event.player.PlayerChatEvent;
+import org.allaymc.api.event.player.PlayerDeathEvent;
+import org.allaymc.api.event.player.PlayerJoinEvent;
+import org.allaymc.api.event.player.PlayerQuitEvent;
+import org.allaymc.api.lang.TextContainer;
+import org.allaymc.api.lang.TranslationContainer;
+import org.allaymc.api.utils.TextFormat;
 
 public class PlayerListener implements Listener {
 
@@ -25,7 +25,7 @@ public class PlayerListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onQuit(PlayerQuitEvent e) {
-        if (Loader.config.getBoolean("quitMessages") && e.getPlayer().spawned) {
+        if (Loader.config.getBoolean("quitMessages") && e.getPlayer().spawned()) {
             API.sendMessage(TextFormat.clean(Loader.config.getString("info_player_left")
                     .replace("%player%", e.getPlayer().getName())
                     .replace("%quit_message%", textFromContainer(e.getQuitMessage())), true));
@@ -72,7 +72,7 @@ public class PlayerListener implements Listener {
 
     private static String textFromContainer(TextContainer container) {
         if (container instanceof TranslationContainer) {
-            return Server.getInstance().getLanguage()
+            return AllayMC.getInstance().getLanguage()
                     .translateString(container.getText(), ((TranslationContainer) container).getParameters());
         }
         return container.getText();
